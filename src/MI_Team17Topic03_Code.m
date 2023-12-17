@@ -50,6 +50,7 @@ im = imrotate(squeeze(brian(sliceNum, :, :)), 90);
 % Displaying the 135th sagittal slice with its histogram
 figure
 subplot(2, 1, 1), imshow(im, [], 'InitialMagnification', 'fit')
+title(['Sagittal Slice ' int2str(sliceNum)])
 colorbar, drawnow
 subplot(2, 1, 2), imhist(im); ylim([0 1000]), drawnow;
 
@@ -58,20 +59,14 @@ subplot(2, 1, 2), imhist(im); ylim([0 1000]), drawnow;
 
 %% THRESHOLDING
 
-thr = mean(im); % TODO: Verify optimal threshold
-im_thr = imresize(im, [size(im, 1) size(im, 2)]); % TODO: Find a better way to copy images
-for i = 1:1:size(im, 1)
-    for j = 1:1:size(im, 2)
-        if im(i, j) > thr
-            im_thr(i, j) = 1;
-        else
-            im_thr(i, j) = 0;
-        end
-    end
-end
-figure, imshow(im_thr, [], 'InitialMagnification', 'fit')
+thr = 150; % TODO: Verify optimal threshold: cross-sectional area changes
 
-%% SEGMENTATION
+% TODO: How is it working with a vector of means??
+im_thr = im > thr;
+figure, imshow(im_thr, [], 'InitialMagnification', 'fit')
+title(['Thresholded Sagittal Slice ' int2str(sliceNum)])
+
+%% SEGMENTATION SLICE SAGITTAL 135
 
 % Label connected components in the image
 label = bwlabel(im_thr);
@@ -94,8 +89,43 @@ tumor = ismember(label, tumorLabel);
 
 % Displaying the segmentation
 figure, imshow(tumor, [], 'InitialMagnification', 'fit')
-title('Tumor Segmentation')
+title('Tumor Segmentation Sagittal Slice 135')
 
-%% CROSS-SECTIONAL AREA
-disp(['Cross-sectional area: ' int2str(maxArea)])
+%% CROSS-SECTIONAL AREA SAGITTAL SLICE 135
+disp(['Cross-sectional area of sagittal slice 135: ' int2str(maxArea)])
+
+%% SEGMENTATION SAGITTAL VOLUME
+
+% Rotating the volume such that montage outputs sagittal slices
+% sag_brian = imrotate3(brian, 180, [0 1 1]);
+% figure, montage(sag_brian)
+
+thr_k = 150;
+for k = 1:1:size(brian, 1)
+
+    % Extracting the sagittal slice
+    im_k = imrotate(squeeze(brian(k, :, :)), 90);
+
+    % Thresholding
+    sag_thr = im_k > thr_k;
+
+    % Preprocessing
+    % TODO: Preprocessing to isolate only soft tissues
+
+    % Segmentation
+    label = bwlabel(sag_thr);
+    stats = regionprops(logical(sag_thr), 'Solidity', 'Area');
+    density = [stats.Solidity]; area = [stats.Area];
+    denseArea = density > 0.5;
+    maxArea = max(area(denseArea));
+    tumorLabel = find(area == maxArea);
+    tumor = ismember(label, tumorLabel);
+    imshow(tumor)
+
+    % TODO: When there is no tumor cutting out
+
+end
+
+%% CROOS-SECTIONAL AREA SAGITTAL VOLUME
+
 
