@@ -56,13 +56,26 @@ subplot(2, 1, 2), imhist(im); ylim([0 1000]), drawnow;
 
 %% FILTERING
 % TODO: Smooth out the image such that the tumor appears as a homogeneous mass
+im_eq = histeq(im);
+figure,
+subplot(2, 1, 1), imshow(im)
+subplot(2, 1, 2), imshow(im_eq)
+
+%% REMOVING MASK
+mask = im > 220;
+bw_im = im > 150;
+soft = im;
+soft(mask) = 0;
+figure
+subplot(2, 2, 1), imshow(mask), title('Mask')
+subplot(2, 2, 2), imshow(bw_im), title('Thresholded')
+subplot(2, 2, 3), imshow(soft), title('Filtered')
 
 %% THRESHOLDING
 
-thr = 150; % TODO: Verify optimal threshold: cross-sectional area changes
+low_thr = 210; % TODO: Verify optimal threshold: cross-sectional area changes
 
-% TODO: How is it working with a vector of means??
-im_thr = im > thr;
+im_thr = im_eq > low_thr;
 figure, imshow(im_thr, [], 'InitialMagnification', 'fit')
 title(['Thresholded Sagittal Slice ' int2str(sliceNum)])
 
@@ -107,25 +120,78 @@ for k = 1:1:size(brian, 1)
     im_k = imrotate(squeeze(brian(k, :, :)), 90);
 
     % Thresholding
-    sag_thr = im_k > thr_k;
+    % sag_thr = im_k > thr_k;
 
     % Preprocessing
     % TODO: Preprocessing to isolate only soft tissues
+    % TODO: Maybe crop
 
+    mask = im_k > 220;
+    bw_im = im_k > 150;
+    soft = im_k;
+    soft(mask) = 0;
+    sag_thr = soft > 150;
     % Segmentation
     label = bwlabel(sag_thr);
     stats = regionprops(logical(sag_thr), 'Solidity', 'Area');
+    
     density = [stats.Solidity]; area = [stats.Area];
-    denseArea = density > 0.5;
+    denseArea = density > 0.6; % Empirical
     maxArea = max(area(denseArea));
     tumorLabel = find(area == maxArea);
     tumor = ismember(label, tumorLabel);
     imshow(tumor)
 
-    % TODO: When there is no tumor cutting out
+    % TODO: When there is no tumor cutting out (4 regions: 3 skull, 1
+    % sinus)
 
 end
 
 %% CROOS-SECTIONAL AREA SAGITTAL VOLUME
+lowThreshold = 255;
+mask = im >= lowThreshold;
+mask(1, :) = false;
+figure
+imshow(mask); 
+title('Initial Mask Image');
+
+%%
+figure
+im_thr(mask) = 0;
+imshow(im_thr)
+
+% Erode the mask some
+radius = 29;
+se = strel('disk', radius, 0);
+mask = imfill(mask, 'holes');
+mask = imerode(mask, se);
+figure, imshow(mask)
+
+%% 
+insideSkull = (im > 0.3*255);   %isolate all dense material
+
+insideSkull = imfill(insideSkull, 'holes'); 
+imshow(insideSkull)
+bw = (im > 0.4*255); 
+lbl = bwlabel(skull);
+skull = find(Solidity < 0.2);
+skull = ismember(lbl, skull);
+skullOrBorder = skull | ~insideSkull;
+noSkull = img;
+noSkull(skullOrBorder)=0;
+imshow(noSkull);  %this only contains gray matter and tumor
+
+%%
+label = bwlabel(im_thr);
+stats = regionprops(logical(im_thr), 'Solidity', 'Area');
+density = [stats.Solidity]; area = [stats.Area];
+
+
+s1Area = density > 0.3; s2Area = density > 0.2;
+faceArea = max(area(s1Area)); skullArea = max(area(s2Area));
+faceLabel = find(area == faceArea); skullLabel = find(area == skullArea);
+face = ismember(label, faceLabel); skull = ismember(label, skullLabel);
+mask = face + skull;
+figure, imshow(mask)
 
 
