@@ -34,7 +34,7 @@ slice_k = imrotate(squeeze(vol(k, :, :)), 90); % Slice extraction
 figure, imshow(seg_k, [], 'InitialMagnification', 'fit')
 title(['Sagittal Slice ' int2str(k) ' Cross-Sectional Area: ' int2str(area_k)])
 
-%% SEGMENTATION SAGITTAL VOLUME
+%% SEGMENTATION OF WHOLE SAGITTAL VOLUME
 
 % Rotating the volume such that montage outputs sagittal slices
 % sag_brian = imrotate3(brian, 180, [0 1 1]);
@@ -48,9 +48,10 @@ for k = 1:1:size(vol, 1)
     % TODO: Find a better way to remove irrelevant tissue
 
     % Skipping slices without dense material
-    if area < 100 % Empirical and incorrect
+    if area < 100 % Empirical and incorrect!!
         continue
     else
+        %TODO: Understand why imshow() parameters don't work
         imshow(tumor) % Displaying segmentation
         % disp(['Cross-sectional area of slice ' num2str(k) ' is ' num2str(area)]) % Displaying cross-sectional area
     end
@@ -58,11 +59,16 @@ end
 
 % TODO: Create montage of sagittal tumor segmentations
 
+%% SEGMENTATION OF WHOLE AXIAL VOLUME
+% TODO: tutto
+
+%% SEGMENTATION WITH NOISE
+% TODO: tutto
+
 %% SEGMENTATION FUNCTION
 
-% TODO: Define thresholds as params if variable
-% TODO: Brak down into substep functions
-
+% TODO: Define thresholds as params if we decide on them being variable
+% TODO: Break down into substep functions
 function [im_out, area] = seg(im_in)
 
     bw_im = im_in > 150 & im_in < 220; % Thresholding

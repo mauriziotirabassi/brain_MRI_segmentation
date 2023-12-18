@@ -12,7 +12,6 @@ load('MRIdata.mat');
 imshow(imread('memref.jpg'))
 
 %% VOLUME VISUALIZATION
-% https://www.mathworks.com/help/images/exploring-slices-from-a-3-dimensional-mri-data-set.html
 
 % orthosliceViewer(brian)
 volumeViewer(vol)
@@ -35,7 +34,7 @@ slice_k = imrotate(squeeze(vol(k, :, :)), 90); % Slice extraction
 figure, imshow(seg_k, [], 'InitialMagnification', 'fit')
 title(['Sagittal Slice ' int2str(k) ' Cross-Sectional Area: ' int2str(area_k)])
 
-%% SEGMENTATION SAGITTAL VOLUME
+%% SEGMENTATION OF WHOLE SAGITTAL VOLUME
 
 % Rotating the volume such that montage outputs sagittal slices
 % sag_brian = imrotate3(brian, 180, [0 1 1]);
@@ -59,6 +58,8 @@ end
 
 % TODO: Create montage of sagittal tumor segmentations
 
+%% SEGMENTATION OF WHOLE A
+
 %% SEGMENTATION FUNCTION
 
 % TODO: Define thresholds as params if variable
@@ -67,7 +68,7 @@ end
 function [im_out, area] = seg(im_in)
 
     bw_im = im_in > 150 & im_in < 220; % Thresholding
-    label = bwlabel(bw_im); % Labelling continuous regions
+    label = bwlabel(bw_im); % Labeling continuous regions
 
     % Stats of continuous regions
     stats = regionprops(logical(bw_im), 'Solidity', 'Area');
