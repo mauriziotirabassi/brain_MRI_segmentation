@@ -11,94 +11,29 @@ end
 load('MRIdata.mat');
 imshow(imread('memref.jpg'))
 
-%% DATA PREPROCESSING
-% Removal of singleton dimensions
-brian = squeeze(vol);
-
 %% VOLUME VISUALIZATION
 % https://www.mathworks.com/help/images/exploring-slices-from-a-3-dimensional-mri-data-set.html
 
-% % Displaying the MRI volume across the three planes
-% figure
 % orthosliceViewer(brian)
-% 
-% %% 
-% % Displaying single planes
-% figure, sliceViewer(brian, SliceDirection="X"), title("Coronal Plane")
-% figure, sliceViewer(brian, SliceDirection="Y"), title("Sagittal Plane")
-% figure, sliceViewer(brian, SliceDirection="Z"), title("Axial Plane")
-% 
-% %% 
-% % Slice planes
-% sx = 1; sy = 1; sz = 2.5;
-% A = [sx 0 0 0; 0 sy 0 0; 0 0 sz 0; 0 0 0 1];
-% tform = affinetform3d(A);
-% brian2 = volshow(brian,renderingStyle="SlicePlanes",Transformation=tform);
-% 
-% %%
-% % Volume rendering
-% volshow(brian, RenderingStyle="VolumeRendering")
+volumeViewer(vol)
 
-% Volume viewer
-volumeViewer(brian)
+%% SEGMENTATION OF SINGLE SAGITTAL SLICE k
 
-%% SEGMENTATION OF SLICE 135
-% Extracting the 135th sagittal slice
-sliceNum = 135;
-im = imrotate(squeeze(brian(sliceNum, :, :)), 90);
+k = 135; % Slice number
+slice_k = imrotate(squeeze(vol(k, :, :)), 90); % Slice extraction
 
-% Displaying the 135th sagittal slice with its histogram
-figure
-subplot(2, 1, 1), imshow(im, [], 'InitialMagnification', 'fit')
-title(['Sagittal Slice ' int2str(sliceNum)])
-colorbar, drawnow
-subplot(2, 1, 2), imhist(im); ylim([0 1000]), drawnow;
+% Filtering
+% TODO: Filtering that could help (stuff w/ histograms?)
 
-%% FILTERING
-% TODO: Smooth out the image such that the tumor appears as a homogeneous mass
-im_eq = histeq(im);
-figure,
-subplot(2, 1, 1), imshow(im)
-subplot(2, 1, 2), imshow(im_eq)
+% Preprocessing
+% TODO: Calling broken down substep functions
+%       (right now the whole pipeline is inside seg())
 
-%% REMOVING MASK
-mask = im_eq > 
+[seg_k, area_k] = seg(slice_k); % Segmentation
 
-%% THRESHOLDING
-
-low_thr = 250; % TODO: Verify optimal threshold: cross-sectional area changes
-
-im_thr = im_eq > low_thr;
-figure, imshow(im_thr, [], 'InitialMagnification', 'fit')
-title(['Thresholded Sagittal Slice ' int2str(sliceNum)])
-
-%% SEGMENTATION SLICE SAGITTAL 135
-
-% Label connected components in the image
-label = bwlabel(im_thr);
-
-% Defining density and area of regions of the image
-stats = regionprops(logical(im_thr), 'Solidity', 'Area');
-density = [stats.Solidity]; area = [stats.Area];
-
-% Isolating relatively dense areas
-denseArea = density > 0.5; % TODO: Verify optimal density for tumor recognition
-
-% Isolating the tumor as the largest area relatively to density threshold
-maxArea = max(area(denseArea));
-
-% Getting the label corresponding to the tumor area
-tumorLabel = find(area == maxArea);
-
-% Extracting the tumor out of the labeled image
-tumor = ismember(label, tumorLabel);
-
-% Displaying the segmentation
-figure, imshow(tumor, [], 'InitialMagnification', 'fit')
-title('Tumor Segmentation Sagittal Slice 135')
-
-%% CROSS-SECTIONAL AREA SAGITTAL SLICE 135
-disp(['Cross-sectional area of sagittal slice 135: ' int2str(maxArea)])
+% Displaying the slice with its cross-sectional area
+figure, imshow(seg_k, [], 'InitialMagnification', 'fit')
+title(['Sagittal Slice ' int2str(k) ' Cross-Sectional Area: ' int2str(area_k)])
 
 %% SEGMENTATION SAGITTAL VOLUME
 
@@ -106,80 +41,44 @@ disp(['Cross-sectional area of sagittal slice 135: ' int2str(maxArea)])
 % sag_brian = imrotate3(brian, 180, [0 1 1]);
 % figure, montage(sag_brian)
 
-thr_k = 150;
-for k = 1:1:size(brian, 1)
+figure
+for k = 1:1:size(vol, 1)
+    im_k = imrotate(squeeze(vol(k, :, :)), 90); % Extracting the sagittal slice
+    [tumor, area] = seg(im_k); 
 
-    % Extracting the sagittal slice
-    im_k = imrotate(squeeze(brian(k, :, :)), 90);
+    % TODO: Find a better way to remove irrelevant tissue
 
-    % Thresholding
-    sag_thr = im_k > thr_k;
+    % Skipping slices without dense material
+    if area < 100 % Empirical and incorrect
+        continue
+    else
+        imshow(tumor) % Displaying segmentation
+        % disp(['Cross-sectional area of slice ' num2str(k) ' is ' num2str(area)]) % Displaying cross-sectional area
+    end
+end
 
-    % Preprocessing
-    % TODO: Preprocessing to isolate only soft tissues
-    % TODO: Maybe crop
+% TODO: Create montage of sagittal tumor segmentations
 
-    % Segmentation
-    label = bwlabel(sag_thr);
-    stats = regionprops(logical(sag_thr), 'Solidity', 'Area');
-    
+%% SEGMENTATION FUNCTION
+
+% TODO: Define thresholds as params if variable
+% TODO: Brak down into substep functions
+
+function [im_out, area] = seg(im_in)
+
+    bw_im = im_in > 150 & im_in < 220; % Thresholding
+    label = bwlabel(bw_im); % Labelling continuous regions
+
+    % Stats of continuous regions
+    stats = regionprops(logical(bw_im), 'Solidity', 'Area');
     density = [stats.Solidity]; area = [stats.Area];
+
+    % Supposing the tumor is the largest dense area
     denseArea = density > 0.6; % Empirical
     maxArea = max(area(denseArea));
     tumorLabel = find(area == maxArea);
-    tumor = ismember(label, tumorLabel);
-    imshow(tumor)
+    im_out = ismember(label, tumorLabel);
 
-    % TODO: When there is no tumor cutting out (4 regions: 3 skull, 1
-    % sinus)
+    area = maxArea; % Cross-sectional area of the supposed tumor
 
 end
-
-%% CROOS-SECTIONAL AREA SAGITTAL VOLUME
-lowThreshold = 255;
-mask = im >= lowThreshold;
-mask(1, :) = false;
-figure
-imshow(mask); 
-title('Initial Mask Image');
-
-%%
-figure
-im_thr(mask) = 0;
-imshow(im_thr)
-
-% Erode the mask some
-radius = 29;
-se = strel('disk', radius, 0);
-mask = imfill(mask, 'holes');
-mask = imerode(mask, se);
-figure, imshow(mask)
-
-%% 
-insideSkull = (im > 0.3*255);   %isolate all dense material
-
-insideSkull = imfill(insideSkull, 'holes'); 
-imshow(insideSkull)
-bw = (im > 0.4*255); 
-lbl = bwlabel(skull);
-skull = find(Solidity < 0.2);
-skull = ismember(lbl, skull);
-skullOrBorder = skull | ~insideSkull;
-noSkull = img;
-noSkull(skullOrBorder)=0;
-imshow(noSkull);  %this only contains gray matter and tumor
-
-%%
-label = bwlabel(im_thr);
-stats = regionprops(logical(im_thr), 'Solidity', 'Area');
-density = [stats.Solidity]; area = [stats.Area];
-
-
-s1Area = density > 0.3; s2Area = density > 0.2;
-faceArea = max(area(s1Area)); skullArea = max(area(s2Area));
-faceLabel = find(area == faceArea); skullLabel = find(area == skullArea);
-face = ismember(label, faceLabel); skull = ismember(label, skullLabel);
-mask = face + skull;
-figure, imshow(mask)
-
-
