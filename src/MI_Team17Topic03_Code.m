@@ -66,7 +66,7 @@ end
 function [im_out, area] = seg(im_in)
 
     bw_im = im_in > 150 & im_in < 220; % Thresholding
-    label = bwlabel(bw_im); % Labelling continuous regions
+    label = bwlabel(bw_im); % Labeling continuous regions
 
     % Stats of continuous regions
     stats = regionprops(logical(bw_im), 'Solidity', 'Area');
