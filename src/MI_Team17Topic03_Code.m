@@ -32,15 +32,15 @@ sagittal_window = [140 23 39 29]; axial_window = [138 107 42 39]; % Empirical
 
 %% SEGMENTATION OF SINGLE SAGITTAL SLICE k
 
-k = 120; % Slice number
+% TODO: Review segmentation parameters. Missing pieces for slice 135. Not
+% good for the first thing the professor sees.
+
+k = 135; % Slice number
 slice_k = sagittal(vol, k); % Extracting the slice
 [tumor_k, area_k] = segmentation2(slice_k, sagittal_window); % Segmenting the tumor
 
-% Overlaying the segmented tumor on the original image
-overlay_k = overlay(slice_k, tumor_k, sagittal_window);
-
 % Displaying the segmentation
-imshow(overlay_k, [], 'InitialMagnification', 'fit')
+imshow(tumor_k, [], 'InitialMagnification', 'fit')
 title(['Sagittal Slice: ' int2str(k) ' - Cross-Sectional Area: ' int2str(area_k)])
 drawnow
 
@@ -54,12 +54,11 @@ sagittal_volume = ones(sagittal_dim);
 for k = sagittal_range(1):1:sagittal_range(2)
     slice = sagittal(vol, k);
     [tumor, area] = segmentation2(slice, sagittal_window); 
-    segmentation = overlay(slice, tumor, sagittal_window);
-    imshow(segmentation, [], 'InitialMagnification', 'fit'), drawnow
+    imshow(tumor, [], 'InitialMagnification', 'fit'), drawnow
 
     % TODO: Create a montage instead of an animation (RGB problem)
     % TODO: Understand how to display the cross-sectional area values
-    % sagittal_volume(:, :, k) = segmentation;
+    % sagittal_volume(:, :, k) = tumor;
 end
 
 %% SEGMENTATION OF WHOLE AXIAL VOLUME
@@ -68,12 +67,11 @@ axial_volume = ones(axial_dim);
 for k = axial_range(1):1:axial_range(2)
     slice = axial(vol, k);
     [tumor, area] = segmentation2(slice, axial_window); 
-    segmentation = overlay(slice, tumor, axial_window);
-    % imshow(segmentation, [], 'InitialMagnification', 'fit'), drawnow
+    imshow(tumor, [], 'InitialMagnification', 'fit'), drawnow
 
     % TODO: Create a montage instead of an animation (RGB problem)
     % TODO: Understand how to display the cross-sectional area values
-    % axial_volume(:, :, k) = segmentation;
+    % axial_volume(:, :, k) = tumor;
 end
 
 %% SEGMENTATION WITH NOISE
@@ -120,6 +118,12 @@ function [im_out] = axial(volume, slice_num)
     im_out = squeeze(volume(:, :, slice_num));
 end
 
+% Overlays the second image on top of the first one in the given rectangle
+function [im_out] = overlay(im_in1, im_in2, rect)
+    pad_im_2 = padarray(im_in2, [rect(2) - 1, rect(1) - 1], 0, 'pre');
+    im_out = imfuse(im_in1, pad_im_2);
+end
+
 % TODO: Define thresholds as params if we decide on them being variable
 % TODO: Break down into substep functions
 function [im_out, area] = segmentation2(im_in, rect)
@@ -136,17 +140,17 @@ function [im_out, area] = segmentation2(im_in, rect)
     density = [stats.Solidity]; area = [stats.Area];
 
     % Supposing the tumor is the largest dense area
-    denseArea = density > 0.6; % Empirical
-    maxArea = max(area(denseArea));
-    tumorLabel = find(area == maxArea);
-    im_out = imfill(ismember(label, tumorLabel), 'holes');
-
+    denseArea = density > 0.6; % Areas with empirical density
+    maxArea = max(area(denseArea)); % Largest area with empirical density
+    tumorLabel = find(area == maxArea); % Label of the supposed tumor
+    tumor = ismember(label, tumorLabel); % Extracting the image from the label
+    filled_tumor = imfill(tumor, 'holes'); % Correcting the image
+    
+    % Overlaying the segmented tumor on the original image
+    im_out = overlay(im_in, filled_tumor, rect);
+    
     area = maxArea; % Cross-sectional area of the supposed tumor
 
 end
 
-% Overlays the second image on top of the first one in the given rectangle
-function [im_out] = overlay(im_in1, im_in2, rect)
-    pad_im_2 = padarray(im_in2, [rect(2) - 1, rect(1) - 1], 0, 'pre');
-    im_out = imfuse(im_in1, pad_im_2);
-end
+
