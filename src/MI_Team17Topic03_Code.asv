@@ -40,7 +40,7 @@ sagittal_window = [140 23 39 29]; axial_window = [138 107 42 39]; % Empirical
 k = 135; % Slice number
 slice_k = slice(selectvol(vol, 'sagittal'), k); % Extracting the slice
 [tumor_k, area_k] = segmentation2(slice_k, sagittal_window);
-saggital_k=slice_k; %fixing local error
+sagittal_k=slice_k; %fixing local error
 % Displaying the segmentation
 imshow(tumor_k, [], 'InitialMagnification', 'fit')
 title(['Sagittal Slice: ' int2str(k) ' - Cross-Sectional Area: ' int2str(area_k)])
@@ -48,30 +48,36 @@ drawnow
 
 %% SEGMENTATION OF THE WHOLE VOLUME
 
-clc, valid_type = {'axial', 'sagittal', 'coronal'};
+valid_volume = {'axial', 'sagittal', 'coronal', 'quit'};
+valid_noise = {'salt & pepper', 'gaussian', 'none'};
 while 1
-    % Requesting user input (choice of type of slices)
-    volume_type = input('Write the plane of interest: ', 's');
-    if strcmp(volume_type, 'quit')
-        clc
-        break
-    else
-        while ~any(strcmp(volume_type, valid_type))
-            if strcmp(volume_type, 'quit')
-                clc
-                break
-            else
-                volume_type = input('Write the plane of interest: ', 's');
-            end
-        end 
+    % Requesting user to choose type of slice
+    volume_type = input('Write the plane of interest ("quit" to quit): ', 's');
+    while ~any(strcmp(volume_type, valid_volume))
+        volume_type = input('Write the plane of interest: ', 's');
     end
-    % TODO: Noise option
+    if strcmp(volume_type, 'quit')
+        clc, break
+    end
 
-    % TODO: Improve pipeline
+    % Requesting user to choose type of noise
+    noise_type = input('Add noise ("none" if none): ', 's');
+    while ~any(strcmp(noise_type, valid_noise))
+        noise_type = input('Write the plane of interest: ', 's');
+    end 
+    if strcmp(noise_type, 'none')
+        chosen_vol = vol;
+    else
+        % TODO: Make noise degree iterable (now fixed to 0.05)
+
+        % Supposing adding the noise is independent from slice type
+        chosen_vol = addnoise(vol, noise_type, 0.05);
+    end
+
     % Segmenting the volume
-    [sel_volume, sel_range, sel_window] = selectvol(vol, volume_type);
-    segmentation3(sel_volume, sel_range, sel_window)
-    close all, clc
+    [sel_volume, sel_range, sel_window] = selectvol(chosen_vol, volume_type);
+    segmentation3(sel_volume, sel_range, sel_window);
+    clc, close all
 end
 
 %% SEGMENTATION WITH NOISE
@@ -81,9 +87,9 @@ end
 % Filtering (Testing noise resistance)
 % TODO: Create separate section
 figure, 
-subplot(2, 2, 1), imshow(imgaussfilt(sagittal_k)), title('Original')
+subplot(2, 2, 1), imshow(imgaussfilt(slice_k)), title('Original')
 
-noise = imnoise(sagittal_k, 'salt & pepper', 0.05);
+noise = imnoise(slice_k, 'salt & pepper', 0.05);
 subplot(2, 2, 2), imshow(noise), title('Noise')
 
 filtered = medfilt2(noise);
@@ -95,7 +101,7 @@ subplot(2, 2, 3), imshow(filtered), title('Filtered')
 %       (right now the whole pipeline is inside seg())
 %       gamma point operator (clean around the tumor)
 
-[seg_k, area_k] = segmentation2(sagittal_k, sagittal_window); % Segmentation
+[seg_k, area_k] = segmentation2(slice_k, sagittal_window); % Segmentation
 [seg_filt, area_filt] = segmentation2(filtered, sagittal_window);
 
 % Displaying the slice with its cross-sectional area
@@ -106,20 +112,6 @@ title(['Sagittal Slice ' int2str(k) ' Cross-Sectional Area: ' int2str(area_k)])
 subplot(2, 1, 2), imshow(seg_filt, [], 'InitialMagnification', 'fit')
 title(['Sagittal Slice ' int2str(k) ' Filtered Area: ' int2str(area_filt)])
 
-%%
-vol_t = selectvol(vol, 'axial');
-subplot(1, 2, 1), montage(vol_t)
-vol_n = addnoise(vol_t, 'salt & pepper', 0.05);
-subplot(1, 2, 2), montage(vol_n)
-
-
-%%
-h = 100;
-c_vol = selectvol(vol, 'sagittal');
-vol_noise = zeros(size(c_vol));
-vol_noise(:, :, h) = imnoise(slice(c_vol, h), 'salt & pepper', 0.10);
-subplot(1, 2, 1), imshow(slice(c_vol, h))
-subplot(1, 2, 2), imshow(squeeze(vol_noise(:, :, h)))
 %% FUNCTIONS
 
 % TODO: Understand if one can pass ranges and windows
@@ -183,7 +175,6 @@ function [] = segmentation3(volume, range, window)
     for k = range(1):1:range(2)
         slice_k = slice(volume, k);
         [tumor, area] = segmentation2(slice_k, window); 
-
         % TODO: Decide function behavior
         imshow(tumor, [], 'InitialMagnification', 'fit'), drawnow
     
@@ -193,10 +184,14 @@ function [] = segmentation3(volume, range, window)
     end
 end
 
+% TODO: Understnd why preallocating fucks things up
 % Adds noise to a volume
 function [vol_out] = addnoise(vol_in, noise, degree)
-    vol_out = zeros(size(vol_in));
+    % tmp = zeros(size(vol_in));
     for k = 1:1:size(vol_in, 3)
-        vol_out(:, :, k) = imnoise(slice(vol_in, k), noise, degree);
+        im = slice(vol_in, k);
+        im_n = imnoise(im, noise, degree);
+        vol_out(:, :, k) = im_n;
     end
+    % vol_out = tmp;
 end
