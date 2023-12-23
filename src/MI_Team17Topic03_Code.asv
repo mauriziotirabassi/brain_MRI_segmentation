@@ -40,7 +40,7 @@ sagittal_window = [140 23 39 29]; axial_window = [138 107 42 39]; % Empirical
 k = 135; % Slice number
 slice_k = slice(selectvol(vol, 'sagittal'), k); % Extracting the slice
 [tumor_k, area_k] = segmentation2(slice_k, sagittal_window);
-
+saggital_k=slice_k; %fixing local error
 % Displaying the segmentation
 imshow(tumor_k, [], 'InitialMagnification', 'fit')
 title(['Sagittal Slice: ' int2str(k) ' - Cross-Sectional Area: ' int2str(area_k)])
@@ -106,6 +106,20 @@ title(['Sagittal Slice ' int2str(k) ' Cross-Sectional Area: ' int2str(area_k)])
 subplot(2, 1, 2), imshow(seg_filt, [], 'InitialMagnification', 'fit')
 title(['Sagittal Slice ' int2str(k) ' Filtered Area: ' int2str(area_filt)])
 
+%%
+vol_t = selectvol(vol, 'axial');
+subplot(1, 2, 1), montage(vol_t)
+vol_n = addnoise(vol_t, 'salt & pepper', 0.05);
+subplot(1, 2, 2), montage(vol_n)
+
+
+%%
+h = 100;
+c_vol = selectvol(vol, 'sagittal');
+vol_noise = zeros(size(c_vol));
+vol_noise(:, :, h) = imnoise(slice(c_vol, h), 'salt & pepper', 0.10);
+subplot(1, 2, 1), imshow(slice(c_vol, h))
+subplot(1, 2, 2), imshow(squeeze(vol_noise(:, :, h)))
 %% FUNCTIONS
 
 % TODO: Understand if one can pass ranges and windows
@@ -179,9 +193,10 @@ function [] = segmentation3(volume, range, window)
     end
 end
 
-function [] = addnoise(vol_in, noise, degree)
-    vol_out = ones(size(vol_in));
+% Adds noise to a volume
+function [vol_out] = addnoise(vol_in, noise, degree)
+    vol_out = zeros(size(vol_in));
     for k = 1:1:size(vol_in, 3)
-        vol_out(:, :, k) = imnoise(vol_in(:, :, k), noise, degree);
+        vol_out(:, :, k) = imnoise(slice(vol_in, k), noise, degree);
     end
 end

@@ -40,7 +40,7 @@ sagittal_window = [140 23 39 29]; axial_window = [138 107 42 39]; % Empirical
 k = 135; % Slice number
 slice_k = slice(selectvol(vol, 'sagittal'), k); % Extracting the slice
 [tumor_k, area_k] = segmentation2(slice_k, sagittal_window);
-
+sagittal_k=slice_k; %fixing local error
 % Displaying the segmentation
 imshow(tumor_k, [], 'InitialMagnification', 'fit')
 title(['Sagittal Slice: ' int2str(k) ' - Cross-Sectional Area: ' int2str(area_k)])
