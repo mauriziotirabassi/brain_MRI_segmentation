@@ -14,20 +14,21 @@ load('MRIdata.mat');
 %% VOLUME VISUALIZATION
 
 % Visualizing the volume to approximately assess:
-% 2. The ranges of the slices of interest for the segmentation
-% 3. The slices containing the biggest tumor extention
+% 1. The ranges of the slices of interest for the segmentation
+% 2. The slices containing the biggest tumor extention
 orthosliceViewer(vol);
 % volumeViewer(vol)
-sagittal_range = [105 145]; axial_range = [63 91]; % Empirical
-big_sagittal = 123; big_axial = 78; % Empirical
+sagittal_range = [105 145]; axial_range = [63 91]; % coronal_range = []; % Empirical
+big_sagittal = 123; big_axial = 78; % big_coronal = 158; % Empirical
 
-% Deifning the dimensions of the volumes
-sagittal_dim = [size(vol, 2) size(vol, 3) range(sagittal_range)];
-axial_dim = [size(vol, 1) size(vol, 2) range(axial_range)];
+% % Deifning the dimensions of the volumes
+% sagittal_dim = [size(vol, 2) size(vol, 3) range(sagittal_range)];
+% axial_dim = [size(vol, 1) size(vol, 2) range(axial_range)];
 
 % Using imcrop to manually extract the ROI coordinates
-% imcrop(sagittal(vol, big_sagittal));
-% imcrop(axial(vol, big_axial));
+% imcrop(slice(selectvol(vol, 'sagittal'), big_sagittal));
+% imcrop(slice(selectvol(vol, 'axial'), big_axial));
+% imcrop(slice(selectvol(vol, 'coronal'), big_coronal));
 sagittal_window = [140 23 39 29]; axial_window = [138 107 42 39]; % Empirical
 
 %% SEGMENTATION OF SINGLE SAGITTAL SLICE k
@@ -35,43 +36,42 @@ sagittal_window = [140 23 39 29]; axial_window = [138 107 42 39]; % Empirical
 % TODO: Review segmentation parameters. Missing pieces for slice 135. Not
 % good for the first thing the professor sees.
 
+% Segmenting the tumor
 k = 135; % Slice number
-slice_k = sagittal(vol, k); % Extracting the slice
-[tumor_k, area_k] = segmentation2(slice_k, sagittal_window); % Segmenting the tumor
+slice_k = slice(selectvol(vol, 'sagittal'), k); % Extracting the slice
+[tumor_k, area_k] = segmentation2(slice_k, sagittal_window);
 
 % Displaying the segmentation
 imshow(tumor_k, [], 'InitialMagnification', 'fit')
 title(['Sagittal Slice: ' int2str(k) ' - Cross-Sectional Area: ' int2str(area_k)])
 drawnow
 
-%% SEGMENTATION OF WHOLE SAGITTAL VOLUME
+%% SEGMENTATION OF THE WHOLE VOLUME
 
-% Rotating the volume such that montage outputs sagittal slices
-% sag_brian = imrotate3(brian, 180, [0 1 1]);
-% figure, montage(sag_brian)
+clc, valid_type = {'axial', 'sagittal', 'coronal'};
+while 1
+    % Requesting user input (choice of type of slices)
+    volume_type = input('Write the plane of interest: ', 's');
+    if strcmp(volume_type, 'quit')
+        clc
+        break
+    else
+        while ~any(strcmp(volume_type, valid_type))
+            if strcmp(volume_type, 'quit')
+                clc
+                break
+            else
+                volume_type = input('Write the plane of interest: ', 's');
+            end
+        end 
+    end
+    % TODO: Noise option
 
-sagittal_volume = ones(sagittal_dim);
-for k = sagittal_range(1):1:sagittal_range(2)
-    slice = sagittal(vol, k);
-    [tumor, area] = segmentation2(slice, sagittal_window); 
-    imshow(tumor, [], 'InitialMagnification', 'fit'), drawnow
-
-    % TODO: Create a montage instead of an animation (RGB problem)
-    % TODO: Understand how to display the cross-sectional area values
-    % sagittal_volume(:, :, k) = tumor;
-end
-
-%% SEGMENTATION OF WHOLE AXIAL VOLUME
-
-axial_volume = ones(axial_dim);
-for k = axial_range(1):1:axial_range(2)
-    slice = axial(vol, k);
-    [tumor, area] = segmentation2(slice, axial_window); 
-    imshow(tumor, [], 'InitialMagnification', 'fit'), drawnow
-
-    % TODO: Create a montage instead of an animation (RGB problem)
-    % TODO: Understand how to display the cross-sectional area values
-    % axial_volume(:, :, k) = tumor;
+    % TODO: Improve pipeline
+    % Segmenting the volume
+    [sel_volume, sel_range, sel_window] = selectvol(vol, volume_type);
+    segmentation3(sel_volume, sel_range, sel_window)
+    close all, clc
 end
 
 %% SEGMENTATION WITH NOISE
@@ -106,15 +106,41 @@ title(['Sagittal Slice ' int2str(k) ' Cross-Sectional Area: ' int2str(area_k)])
 subplot(2, 1, 2), imshow(seg_filt, [], 'InitialMagnification', 'fit')
 title(['Sagittal Slice ' int2str(k) ' Filtered Area: ' int2str(area_filt)])
 
+%%
+vol_t = selectvol(vol, 'axial');
+subplot(1, 2, 1), montage(vol_t)
+vol_n = addnoise(vol_t, 'salt & pepper', 0.05);
+subplot(1, 2, 2), montage(vol_n)
+
+
+%%
+h = 100;
+c_vol = selectvol(vol, 'sagittal');
+vol_noise = zeros(size(c_vol));
+vol_noise(:, :, h) = imnoise(slice(c_vol, h), 'salt & pepper', 0.10);
+subplot(1, 2, 1), imshow(slice(c_vol, h))
+subplot(1, 2, 2), imshow(squeeze(vol_noise(:, :, h)))
 %% FUNCTIONS
 
-% Extracts a specific sagittal slice from a volume
-function [im_out] = sagittal(volume, slice_num)
-    im_out = imrotate(squeeze(volume(slice_num, :, :)), 90);
+% TODO: Understand if one can pass ranges and windows
+% Takes as input the axial volume and returns a volume whose third dimension 
+% are the slices in the plane of interest
+function [vol_out, range_out, window_out] = selectvol(volume, type)
+    switch type
+        case 'axial'
+            vol_out = volume;
+            range_out = [63 91]; window_out = [138 107 42 39];
+        case 'sagittal'
+            vol_out = flip(flip(imrotate3(volume, 180, [0 -1 1]), 2), 3);
+            range_out = [105 155]; window_out = [140 23 39 29];
+        % case 'coronal'
+        %     vol_out = imrotate3(volume, 180, [1 0 1]);
+        %     range_out = [135 180]; window_out = [];
+    end
 end
 
-% Extracts a specific axial slice from a volume
-function [im_out] = axial(volume, slice_num)
+% Extracts a specific slice from a volume (always the third dimension)
+function [im_out] = slice(volume, slice_num)
     im_out = squeeze(volume(:, :, slice_num));
 end
 
@@ -124,14 +150,13 @@ function [im_out] = overlay(im_in1, im_in2, rect)
     im_out = imfuse(im_in1, pad_im_2);
 end
 
-% TODO: Define thresholds as params if we decide on them being variable
-% TODO: Break down into substep functions
+% Performs preprocessing and segmentation on a slice
 function [im_out, area] = segmentation2(im_in, rect)
     crp_im = imcrop(im_in, [], rect); % Cropping out the ROI
 
     % TODO: Different meaning between images
     bw_im = im2double(crp_im); % Standardizing the gray scale
-    bw_im = bw_im > 0.588 & bw_im < 0.862; % Thresholding
+    bw_im = bw_im > 0.588 & bw_im < 0.862; % Thresholding % Empirical
 
     label = bwlabel(bw_im); % Labeling continuous regions
 
@@ -153,4 +178,25 @@ function [im_out, area] = segmentation2(im_in, rect)
 
 end
 
+% Performs preprocessing and segmentation on a volume
+function [] = segmentation3(volume, range, window)
+    for k = range(1):1:range(2)
+        slice_k = slice(volume, k);
+        [tumor, area] = segmentation2(slice_k, window); 
 
+        % TODO: Decide function behavior
+        imshow(tumor, [], 'InitialMagnification', 'fit'), drawnow
+    
+        % TODO: Create a montage instead of an animation (RGB problem)
+        % TODO: Understand how to display the cross-sectional area values
+        % axial_volume(:, :, k) = tumor;
+    end
+end
+
+% Adds noise to a volume
+function [vol_out] = addnoise(vol_in, noise, degree)
+    vol_out = zeros(size(vol_in));
+    for k = 1:1:size(vol_in, 3)
+        vol_out(:, :, k) = imnoise(slice(vol_in, k), noise, degree);
+    end
+end
