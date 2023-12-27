@@ -18,7 +18,7 @@ load('MRIdata.mat');
 % 2. The slices containing the biggest tumor extention
 orthosliceViewer(vol);
 % volumeViewer(vol)
-sagittal_range = [105 145]; axial_range = [63 91]; % coronal_range = []; % Empirical
+sagittal_range = [105 145]; axial_range = [60 90]; % coronal_range = []; % Empirical
 big_sagittal = 123; big_axial = 78; % big_coronal = 158; % Empirical
 
 % % Deifning the dimensions of the volumes
@@ -33,46 +33,50 @@ sagittal_window = [140 23 39 29]; axial_window = [138 107 42 39]; % Empirical
 
 %% SEGMENTATION OF SINGLE SAGITTAL SLICE k
 
-% TODO: Review segmentation parameters. Missing pieces for slice 135. Not
-% good for the first thing the professor sees.
-
 % Segmenting the tumor
 k = 135; % Slice number
 slice_k = slice(selectvol(vol, 'sagittal'), k); % Extracting the slice
 [tumor_k, area_k] = segmentation2(slice_k, sagittal_window);
-sagittal_k=slice_k; %fixing local error
+
 % Displaying the segmentation
 imshow(tumor_k, [], 'InitialMagnification', 'fit')
 title(['Sagittal Slice: ' int2str(k) ' - Cross-Sectional Area: ' int2str(area_k)])
 drawnow
 
-%% SEGMENTATION OF THE WHOLE VOLUME
+%% SEGMENTATION OF THE WHOLE VOLUME (WITH NOISE)
 
-valid_volume = {'axial', 'sagittal', 'coronal', 'quit'};
-valid_noise = {'salt & pepper', 'gaussian', 'none'};
+valid_volume = {'axial', 'sagittal', 'coronal', ''};
+valid_noise = {'salt & pepper', 'gaussian', ''};
 while 1
     % Requesting user to choose type of slice
-    volume_type = input('Write the plane of interest ("quit" to quit): ', 's');
+    volume_type = input('Insert the plane of interest (enter to quit): ', 's');
     while ~any(strcmp(volume_type, valid_volume))
-        volume_type = input('Write the plane of interest: ', 's');
+        volume_type = input('Insert the plane of interest: ', 's');
     end
-    if strcmp(volume_type, 'quit')
+    if strcmp(volume_type, '')
         clc, break
     end
 
-    % Requesting user to choose type of noise
-    noise_type = input('Add noise ("none" if none): ', 's');
+    % Requesting user to add noise
+    noise_type = input('Insert noise to add (enter if none): ', 's');
     while ~any(strcmp(noise_type, valid_noise))
-        noise_type = input('Write the plane of interest: ', 's');
+        noise_type = input('Insert noise to add (enter if none): ', 's');
     end 
-    if strcmp(noise_type, 'none')
+    if strcmp(noise_type, '')
         chosen_vol = vol;
     else
-        % TODO: Make noise degree iterable (now fixed to 0.05)
+        % Requesting user noise level
+        noise_level = input('Insert noise level: ', 's');
+        while str2double(noise_level) < 0 | str2double(noise_level) > 1
+            noise_level = input('Insert noise level: ', 's');
+        end 
 
         % Supposing adding the noise is independent from slice type
-        chosen_vol = addnoise(vol, noise_type, 0.05);
+        chosen_vol = addnoise(vol, noise_type, str2double(noise_level));
+
     end
+
+    % TODO: Prompted slice choice but problem in range selection domain
 
     % Segmenting the volume
     [sel_volume, sel_range, sel_window] = selectvol(chosen_vol, volume_type);
@@ -80,51 +84,75 @@ while 1
     clc, close all
 end
 
-%% SEGMENTATION WITH NOISE
+%% NOISE SENSITIVITY ANALYSIS
 
-% TODO: Clean
+% Selecting a random slice as reference (supposing valid for all)
+slice_k = slice(selectvol(vol, 'sagittal'), 135);
+[seg_norm, area_norm] = segmentation2(slice_k, sagittal_window);
 
-% Filtering (Testing noise resistance)
-% TODO: Create separate section
-figure, 
-subplot(2, 2, 1), imshow(imgaussfilt(slice_k)), title('Original')
+% Calculating the detected area relatively to different levels of noise
+filtered = zeros(1, 100); noised = zeros(1, 100); i = 1;
+for k = 0.01:0.01:1
+    % Noise
+    im_noise = imnoise(slice_k, 'salt & pepper', k);
+    [seg_noise, area_noise] = segmentation2(im_noise, sagittal_window);
+    if isempty(area_noise)
+        area_noise = 0;
+    end
+    noised(i) = area_noise;
 
-noise = imnoise(slice_k, 'salt & pepper', 0.05);
-subplot(2, 2, 2), imshow(noise), title('Noise')
+    % Filter
+    filt = medfilt2(im_noise);
+    [seg_filt, area_filt] = segmentation2(filt, sagittal_window);
+    if isempty(area_filt)
+        area_filt = 0;
+    end
+    filtered(i) = area_filt;
 
-filtered = medfilt2(noise);
-filtered = imgaussfilt(filtered);
-subplot(2, 2, 3), imshow(filtered), title('Filtered')
+    i = i + 1;
+end
 
-% Preprocessing
-% TODO: Calling broken down substep functions
-%       (right now the whole pipeline is inside seg())
-%       gamma point operator (clean around the tumor)
+figure, plot(filtered), hold on, plot(noised), hold on, refline(0, area_norm);
+legend({'Filtered','Noise', 'Clean'}, 'Location', 'southwest')
 
-[seg_k, area_k] = segmentation2(slice_k, sagittal_window); % Segmentation
-[seg_filt, area_filt] = segmentation2(filtered, sagittal_window);
+% Deciding to always preventively apply the median filter to reduce
+% eventual salt & pepper noise degradation
 
-% Displaying the slice with its cross-sectional area
-figure, 
-subplot(2, 1, 1), imshow(seg_k, [], 'InitialMagnification', 'fit')
-title(['Sagittal Slice ' int2str(k) ' Cross-Sectional Area: ' int2str(area_k)])
+%% GAUSSIAN NOISE SENSITIVITY
 
-subplot(2, 1, 2), imshow(seg_filt, [], 'InitialMagnification', 'fit')
-title(['Sagittal Slice ' int2str(k) ' Filtered Area: ' int2str(area_filt)])
+h = 1/9.*ones(3,3);
+tmp_im = imnoise(slice_k, "gaussian", 0.2);
+subplot(2, 2, 1), imshow(tmp_im)
+title('Gaussian Noise')
+
+tmp_im = imfilter(tmp_im, h, 'conv');
+subplot(2, 2, 2), imshow(tmp_im)
+title('Filtered')
+
+thr = 0.5;
+db_im = im2double(tmp_im);
+bw_im = db_im > thr; %& bw_im < 0.86;
+subplot(2, 2, 3), imshow(bw_im)
+title(['Threshold: ' num2str(thr)])
+
+gamma = 3;
+im_gamma = imadjust(db_im, [0 1], [0 1], gamma);
+im_gamma = im_gamma > thr;
+subplot(2, 2, 4), imshow(im_gamma, [], 'InitialMagnification', 'fit')
+title(['Gamma' num2str(gamma)]), drawnow
 
 %% FUNCTIONS
 
-% TODO: Understand if one can pass ranges and windows
 % Takes as input the axial volume and returns a volume whose third dimension 
 % are the slices in the plane of interest
 function [vol_out, range_out, window_out] = selectvol(volume, type)
     switch type
         case 'axial'
             vol_out = volume;
-            range_out = [63 91]; window_out = [138 107 42 39];
+            range_out = [60 90]; window_out = [138 107 42 39];
         case 'sagittal'
             vol_out = flip(flip(imrotate3(volume, 180, [0 -1 1]), 2), 3);
-            range_out = [105 155]; window_out = [140 23 39 29];
+            range_out = [105 150]; window_out = [140 23 39 29];
         % case 'coronal'
         %     vol_out = imrotate3(volume, 180, [1 0 1]);
         %     range_out = [135 180]; window_out = [];
@@ -144,28 +172,36 @@ end
 
 % Performs preprocessing and segmentation on a slice
 function [im_out, area] = segmentation2(im_in, rect)
-    crp_im = imcrop(im_in, [], rect); % Cropping out the ROI
+    tmp_im = imcrop(im_in, [], rect); % Cropping out the ROI
+
+    tmp_im = medfilt2(tmp_im); % Applying median filtering
+    % h = 1/9.*ones(3,3); tmp_im = imfilter(tmp_im, h, 'conv');
+
+    % tmp_im = imsharpen(tmp_im); % Applying image sharpening
+    tmp_im = im2double(tmp_im); % Standardizing the gray scale
+
+    % gamma = 2; tmp_im = imadjust(tmp_im, [0 1], [0 1], gamma);
 
     % TODO: Different meaning between images
-    bw_im = im2double(crp_im); % Standardizing the gray scale
-    bw_im = bw_im > 0.588 & bw_im < 0.862; % Thresholding % Empirical
-
-    label = bwlabel(bw_im); % Labeling continuous regions
+    tmp_im = tmp_im > 0.50 & tmp_im < 0.85; % Thresholding % Empirical
+    % tmp_im = edge(tmp_im, 'canny');
+   
+    label = bwlabel(tmp_im); % Labeling continuous regions
 
     % Stats of continuous regions
-    stats = regionprops(logical(bw_im), 'Solidity', 'Area');
+    stats = regionprops(logical(tmp_im), 'Solidity', 'Area');
     density = [stats.Solidity]; area = [stats.Area];
 
-    % Supposing the tumor is the largest dense area
+    % % Supposing the tumor is the largest dense area
     denseArea = density > 0.6; % Areas with empirical density
     maxArea = max(area(denseArea)); % Largest area with empirical density
     tumorLabel = find(area == maxArea); % Label of the supposed tumor
     tumor = ismember(label, tumorLabel); % Extracting the image from the label
     filled_tumor = imfill(tumor, 'holes'); % Correcting the image
-    
+
     % Overlaying the segmented tumor on the original image
     im_out = overlay(im_in, filled_tumor, rect);
-    
+
     area = maxArea; % Cross-sectional area of the supposed tumor
 
 end
@@ -177,7 +213,7 @@ function [] = segmentation3(volume, range, window)
         [tumor, area] = segmentation2(slice_k, window); 
         % TODO: Decide function behavior
         imshow(tumor, [], 'InitialMagnification', 'fit'), drawnow
-    
+        pause(0.05)
         % TODO: Create a montage instead of an animation (RGB problem)
         % TODO: Understand how to display the cross-sectional area values
         % axial_volume(:, :, k) = tumor;
