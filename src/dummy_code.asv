@@ -143,12 +143,12 @@ title(['Gamma' num2str(gamma)]), drawnow
 
 %% experiments and notes
 
-% xy 'axial' (third dimension of vol) plane intersting slices: from 60 to 90
-% yz 'coronal' second dimension of vol) plane interesting slices: from 140 to 180
-% xz 'sagittal' (first dimension of vol) plane interesting slices: from 100 to 145
-sg=rot90(permute(squeeze(vol(100:145,:,:)),[2,3,1]));
-ax=rot90(squeeze(vol(:,:,60:90)));
-cr=rot90(permute(squeeze(vol(:,140:180,:)),[1,3,2]));
+% xy 'axial' (iterate over third dimension of vol) plane intersting slices: from 60 to 90
+% yz 'coronal' (iterate over second dimension of vol) plane interesting slices: from 140 to 180
+% xz 'sagittal' (iterate over first dimension of vol) plane interesting slices: from 100 to 145
+sg=rot90(permute(squeeze(vol(100:145,:,:)),[2,3,1])); %46 slices
+ax=rot90(squeeze(vol(:,:,60:90))); %31 slices
+cr=rot90(permute(squeeze(vol(:,140:180,:)),[1,3,2])); %41 slices
 
 t_vol=vol(100:145,140:180,60:90);
 
@@ -156,6 +156,32 @@ t_vol=vol(100:145,140:180,60:90);
 % application, applying otsu thresholding and smoothing edges + removing
 % some excess manually
 
+true_seg=load('true_segmentation.mat').labels;
+
+% estimation for gaussian noise may be done with std2 function, maybe
+% comparing filtered and unfiltered image
+
+%%
+D=zeros(size(sg,3),50);
+for i=1:size(sg,3)
+    for gamma=0.1:0.1:5
+    tmp=imadjust(squeeze(sg(60:90,140:180,i)),[0 1], [0 1], gamma);
+    tmp=imbinarize(tmp,graythresh(tmp));
+    N=3;
+    kernel = ones(N, N, N) / N^3;
+    blurryImage = convn(double(tmp), kernel, 'same');
+    tmp = tmp > 0.5;
+    D(i,int8(gamma*10))=dice(rot90(squeeze(true_seg(i,:,:))),tmp);
+    end
+end
+
+%%
+for i=1:size(sg,3)
+    plot(D(i,:))
+    hold on
+end
+xline(10,'LineWidth',3)
+%this means gamma<1 improves segmentation performance with otsu method
 %% FUNCTIONS
 
 % Takes as input the axial volume and returns a volume whose third dimension 
