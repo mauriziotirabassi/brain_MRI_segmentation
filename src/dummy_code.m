@@ -161,27 +161,81 @@ true_seg=load('true_segmentation.mat').labels;
 % estimation for gaussian noise may be done with std2 function, maybe
 % comparing filtered and unfiltered image
 
-%%
-D=zeros(size(sg,3),50);
-for i=1:size(sg,3)
-    for gamma=0.1:0.1:5
-    tmp=imadjust(squeeze(sg(60:90,140:180,i)),[0 1], [0 1], gamma);
+%% sagittal test
+for j=0.1:0.1:0.8
+    sg=addnoise(sg,'gaussian',j);
+    D=zeros(size(sg,3),20);
+    for i=1:size(sg,3)
+        for gamma=0.1:0.1:2
+        tmp=imadjust(squeeze(sg(60:90,140:180,i)),[0 1], [0 1], gamma);
+        tmp=imbinarize(tmp,graythresh(tmp));
+        D(i,int8(gamma*10))=dice(rot90(squeeze(true_seg(i,:,:))),tmp);
+        end
+    end
+    figure
+    for i=1:size(sg,3)
+        plot(D(i,:))
+        hold on
+    end
+    xline(10,'LineWidth',3)
+    %this means gamma<1 improves segmentation performance with otsu method
+end
+%testing with different noise levels: higher noise improve performance
+%regardless of gamma, only for gaussian
+%salt & pepper makes it worse but gamma doesn't have an effect for higher
+%noise levels
+sg=rot90(permute(squeeze(vol(100:145,:,:)),[2,3,1]));
+%% axial test
+D=zeros(size(ax,3),20);
+for i=1:size(ax,3)
+    for gamma=0.1:0.1:2
+    tmp=imadjust(ax(100:145,140:180,i),[0 1], [0 1], gamma);
     tmp=imbinarize(tmp,graythresh(tmp));
-    N=3;
-    kernel = ones(N, N, N) / N^3;
-    blurryImage = convn(double(tmp), kernel, 'same');
-    tmp = tmp > 0.5;
-    D(i,int8(gamma*10))=dice(rot90(squeeze(true_seg(i,:,:))),tmp);
+    D(i,int8(gamma*10))=dice(squeeze(true_seg(:,:,i)),tmp);
     end
 end
-
-%%
-for i=1:size(sg,3)
+figure
+for i=1:size(ax,3)
     plot(D(i,:))
     hold on
 end
 xline(10,'LineWidth',3)
-%this means gamma<1 improves segmentation performance with otsu method
+
+%% coronal test
+D=zeros(size(cr,3),20);
+for i=1:size(cr,3)
+    for gamma=0.1:0.1:2
+    tmp=imadjust(cr(60:90,100:145,i),[0 1], [0 1], gamma);
+    tmp=imbinarize(tmp,graythresh(tmp));
+    D(i,int8(gamma*10))=dice(rot90(squeeze(true_seg(:,i,:))),tmp);
+    end
+end
+figure
+for i=1:size(cr,3)
+    plot(D(i,:))
+    hold on
+end
+xline(10,'LineWidth',3)
+
+%% compare otsuthresh with our method
+for j=0.1:0.1:0.8
+    sg=addnoise(sg,'gaussian',j);
+    D=zeros(size(sg,3),20);
+    for i=1:size(sg,3)
+        for gamma=0.1:0.1:2
+        tmp=imadjust(squeeze(sg(60:90,140:180,i)),[0 1], [0 1], gamma);
+        % segment with our method
+        D(i,int8(gamma*10))=dice(rot90(squeeze(true_seg(i,:,:))),tmp);
+        end
+    end
+    figure
+    for i=1:size(sg,3)
+        plot(D(i,:))
+        hold on
+    end
+    xline(10,'LineWidth',3)
+    %this means gamma<1 improves segmentation performance with otsu method
+end
 %% FUNCTIONS
 
 % Takes as input the axial volume and returns a volume whose third dimension 
