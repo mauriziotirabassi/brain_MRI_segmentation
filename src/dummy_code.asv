@@ -146,9 +146,12 @@ title(['Gamma' num2str(gamma)]), drawnow
 % xy 'axial' (iterate over third dimension of vol) plane intersting slices: from 60 to 90
 % yz 'coronal' (iterate over second dimension of vol) plane interesting slices: from 140 to 180
 % xz 'sagittal' (iterate over first dimension of vol) plane interesting slices: from 100 to 145
-sg=rot90(permute(squeeze(vol(100:145,:,:)),[2,3,1])); %46 slices
-ax=rot90(squeeze(vol(:,:,60:90))); %31 slices
-cr=rot90(permute(squeeze(vol(:,140:180,:)),[1,3,2])); %41 slices
+sg_planes=rot90(permute(squeeze(vol(100:145,:,:)),[2,3,1])); %46 slices
+ax_planes=rot90(squeeze(vol(:,:,60:90))); %31 slices
+cr_planes=rot90(permute(squeeze(vol(:,140:180,:)),[1,3,2])); %41 slices
+sg=rot90(permute(squeeze(vol(100:145,140:180,60:90)),[2,3,1])); %46 slices
+ax=rot90(squeeze(vol(100:145,140:180,60:90))); %31 slices
+cr=rot90(permute(squeeze(vol(100:145,140:180,60:90)),[1,3,2])); %41 slices
 
 t_vol=vol(100:145,140:180,60:90);
 
@@ -167,7 +170,7 @@ for j=0.1:0.1:0.8
     D=zeros(size(sg,3),20);
     for i=1:size(sg,3)
         for gamma=0.1:0.1:2
-        tmp=imadjust(squeeze(sg(60:90,140:180,i)),[0 1], [0 1], gamma);
+        tmp=imadjust(sg(:,:,i),[0 1], [0 1], gamma);
         tmp=imbinarize(tmp,graythresh(tmp));
         D(i,int8(gamma*10))=dice(rot90(squeeze(true_seg(i,:,:))),tmp);
         end
@@ -178,18 +181,15 @@ for j=0.1:0.1:0.8
         hold on
     end
     xline(10,'LineWidth',3)
-    %this means gamma<1 improves segmentation performance with otsu method
+    %gamma sligtly effects
 end
-%testing with different noise levels: higher noise improve performance
-%regardless of gamma, only for gaussian
-%salt & pepper makes it worse but gamma doesn't have an effect for higher
-%noise levels
-sg=rot90(permute(squeeze(vol(100:145,:,:)),[2,3,1]));
+%no significant difference at increasing nnoise level
+delete tmp
 %% axial test
 D=zeros(size(ax,3),20);
 for i=1:size(ax,3)
     for gamma=0.1:0.1:2
-    tmp=imadjust(ax(100:145,140:180,i),[0 1], [0 1], gamma);
+    tmp=imadjust(ax(:,:,i),[0 1], [0 1], gamma);
     tmp=imbinarize(tmp,graythresh(tmp));
     D(i,int8(gamma*10))=dice(squeeze(true_seg(:,:,i)),tmp);
     end
@@ -200,12 +200,12 @@ for i=1:size(ax,3)
     hold on
 end
 xline(10,'LineWidth',3)
-
+delete tmp
 %% coronal test
 D=zeros(size(cr,3),20);
 for i=1:size(cr,3)
     for gamma=0.1:0.1:2
-    tmp=imadjust(cr(60:90,100:145,i),[0 1], [0 1], gamma);
+    tmp=imadjust(cr(:,:,i),[0 1], [0 1], gamma);
     tmp=imbinarize(tmp,graythresh(tmp));
     D(i,int8(gamma*10))=dice(rot90(squeeze(true_seg(:,i,:))),tmp);
     end
@@ -216,6 +216,7 @@ for i=1:size(cr,3)
     hold on
 end
 xline(10,'LineWidth',3)
+delete tmp
 
 %% compare otsuthresh with our method
 for j=0.1:0.1:0.8
@@ -223,8 +224,8 @@ for j=0.1:0.1:0.8
     D=zeros(size(sg,3),20);
     for i=1:size(sg,3)
         for gamma=0.1:0.1:2
-        tmp=imadjust(squeeze(sg(60:90,140:180,i)),[0 1], [0 1], gamma);
-        tmp=imbinarize(tmp,segmentation2(squeeze(sg(60:90,140:180,i)),[60:90,140:180]));
+        tmp=imadjust(squeeze(sg(:,:,i)),[0 1], [0 1], gamma);
+        % segment with our method
         D(i,int8(gamma*10))=dice(rot90(squeeze(true_seg(i,:,:))),tmp);
         end
     end
@@ -236,6 +237,7 @@ for j=0.1:0.1:0.8
     xline(10,'LineWidth',3)
     %this means gamma<1 improves segmentation performance with otsu method
 end
+
 %% FUNCTIONS
 
 % Takes as input the axial volume and returns a volume whose third dimension 
