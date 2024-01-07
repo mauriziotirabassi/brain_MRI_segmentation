@@ -210,9 +210,9 @@ function [im_out, area] = segment(im_in)
     tmp_im = tmp_im > 0.50 & tmp_im < 0.85; % Empirical thresholding
     label = bwlabel(tmp_im); % Labeling continuous regions
     stats = regionprops(logical(tmp_im), 'Solidity', 'Area'); % Stats of continuous regions
-    density = [stats.Solidity]; area = [stats.Area]; disp(size(area))
+    density = [stats.Solidity]; area = [stats.Area];
     denseArea = density > 0.6; % Areas with empirical density
-    maxArea = max(area(denseArea)); disp(size(maxArea)), disp('----') % Largest area with empirical density
+    maxArea = max(area(denseArea)); % Largest area with empirical density
     lesionLabel = find(area == maxArea); % Label of the supposed tumor
     lesion = ismember(label, lesionLabel); % Extracting the image from the label
     im_out = imfill(lesion, 'holes'); % Correcting the image
@@ -268,7 +268,7 @@ function [] = assess_gamma(volume, type, ground_truth)
         ylim([0 1]), xlim([0 20])
         ylabel('Dice Coefficient'), xlabel('Brighter <-- 10 γ --> Darker')
         legend({'Our Workflow', 'Otsu', ' γ = 1'}, 'Location', 'southwest')
-        title(['Analysis over ' type ' planes'])
+        title(['Analysis of new ' type ' slice ' num2str(i)])
         pause(0.05), drawnow, hold off
     end
 end
