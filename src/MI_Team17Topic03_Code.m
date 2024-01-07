@@ -21,18 +21,18 @@ sagittal_range = [100 145];
 % coronal_range = [140 180];
 orthosliceViewer(vol);
 
-% Extracting the orthogonal planes according to the ranges (see function
-% select_vol()) and permuting the volume such that the third dimension
-% iterates through the slices of interest
+% Extracting the orthogonal planes according to the ranges and permuting 
+% the volume such that the third dimension iterates through the slices of 
+% interest (see selectvol())
 % sg_planes = rot90(permute(squeeze(vol(100:145,:,:)),[2,3,1]));
 % ax_planes = rot90(squeeze(vol(:,:,60:90)));
 % cr_planes = rot90(permute(squeeze(vol(:,140:180,:)),[1,3,2]));
 
 % For each plane identifying the slice with the biggest lesion extention and
 % using it to empirically define the ROI window using imcrop()
-% sagittal_window = [140 25 40 30]; % Original sagittal slice 125
-% axial_window = [105 80 45 45]; % Original axial slice 79
-% coronal_window = [100 20 45 30]; % Original coronal slice 158
+% sagittal_window = [140 25 41 31]; % Original sagittal slice 125
+% axial_window = [105 80 41 46]; % Original axial slice 79
+% coronal_window = [100 20 46 31]; % Original coronal slice 158
 
 %% 3. SEGMENTATION OF SAGITTAL SLICE 135
 
@@ -40,10 +40,15 @@ og_num = 135; % From reference
 actual_num = 135 - sagittal_range(1); % Slice number
 [sg_vol, sg_wnd] = selectvol(vol, 'sagittal'); % Selecting sagittal volume and ROI
 slice_k = slice(sg_vol, actual_num); % Extracting the slice
-[tumor_k, area_k] = segmentation2(slice_k, sg_wnd); % Segmenting the lesion
+
+diocsn = imcrop(slice_k, [], sg_wnd); % TODO OOOOH
+
+[tumor_k1, area_k] = segment(diocsn); % Segmenting the lesion
+
+tumor1 = overlay(slice_k, tumor_k1, sg_wnd); % TODO DIOCAN
 
 % Displaying the segmentation
-imshow(tumor_k, [], 'InitialMagnification', 'fit')
+imshow(tumor1, [], 'InitialMagnification', 'fit')
 title(['Original Sagittal Slice: ' int2str(og_num) ' - Cross-Sectional Area: ' int2str(area_k)])
 drawnow
 
@@ -82,11 +87,11 @@ while 1
 
     % Segmenting the volume
     [sel_volume, sel_window] = selectvol(chosen_vol, volume_type);
-    segmentation3(sel_volume, sel_window);
+    show_volume_segmentation(sel_volume, sel_window);
     clc, close all
 end
 
-%% 5. 6. NOISE SENSITIVITY ANALYSIS
+%% NOISE SENSITIVITY ANALYSIS
 % Assessing sensitivity to different noise levels and whether the application 
 % of a preemptive median filter enhances general performance
 
@@ -108,7 +113,7 @@ for noise_level = 0.01:0.01:1
     noised(i) = area_noise; % Saving the cross-sectional area
 
     % Segmenting with the application of the median filter
-    [~, area_filt] = segmentation2(im_noise, sg_wnd);
+    [~, area_filt] = segment(im_noise, sg_wnd);
     if isempty(area_filt)
         area_filt = 0;
     end
@@ -124,14 +129,19 @@ ylabel('Cross-Sectional Area'), xlabel('Noise Percentage')
 % Therefore we decide to always preemptively apply the median filter to 
 % reduce eventual salt & pepper noise degradation
 
-%%
+% The same test performed with gaussian noise showed that, regardless of
+% filtering, the segmentation performance was significantly worsened.
+% Therefore we decided upon not applying a preemptive averaging filter.
 
-% File 'true_segmentation.mat' was created using the volume segmenter
+%% 6. PERFORMANCE ANALSYSIS WITH DICE COEFFICIENT
+
+% The file 'true_segmentation.mat' was created using the volume segmenter
 % application, applying Otsu thresholding and smoothing edges + removing
-% some excess manually
+% some excesses manually
 true_seg = load('true_segmentation.mat').labels; % Ground truth
 
-%% Sagittal Test with Noise
+%%
+% Sagittal Test with Noise
 for noise_level = 0.1:0.1:0.8
     sg = addnoise(sg,'gaussian', noise_level);
     ground_truth = true_seg;
@@ -139,29 +149,53 @@ for noise_level = 0.1:0.1:0.8
 end
 %no significant difference at increasing noise level
 
-%% Axial Test
-ground_truth = permute(true_seg, [3 1 2]);
-assess_gamma(vol, 'axial',  ground_truth)
+%%
+% Command-line interface (CLI)
+valid_volume = {'axial', 'sagittal', 'coronal', ''};
+valid_noise = {'salt & pepper', 'gaussian', ''};
+while 1
+    % Requesting user to choose type of slice
+    volume_type = input('Insert the plane of interest (enter to quit): ', 's');
+    while ~any(strcmp(volume_type, valid_volume))
+        volume_type = input('Insert the plane of interest: ', 's');
+    end
+    if strcmp(volume_type, '')
+        clc, break
+    end
 
-%% Coronal Test
-ground_truth = permute(true_seg, [2 1 3]);
-assess_gamma(cr, ground_truth)
+    if strcmp(volume_type, 'axial')
+        ground_truth = true_seg;
+    elseif strcmp(volume_type, 'sagittal')
+        ground_truth = permute(true_seg, [2 3 1]);
+    elseif strcmp(volume_type, 'coronal')
+        ground_truth = permute(true_seg, [3 1 2]);
+    end
+
+    % Assessing Dice coefficient
+    assess_gamma(vol, selectvol(vol, volume_type), ground_truth)
+    clc, close all
+end
+
+%% Axial Test
+ground_truth = true_seg;
+assess_gamma(vol, 'axial',  ground_truth)
 
 %% FUNCTIONS
 
-% Takes as input the axial volume and returns a volume whose third dimension 
-% are the slices in the plane of interest
+% Extracts the orthogonal planes according to the ranges and permuting 
+% the volume such that the third dimension iterates through the slices of 
+% interest
 function [vol_out, window_out] = selectvol(volume, type)
     switch type
         case 'axial'
             vol_out = rot90(squeeze(volume(:, :, 60:90)));
-            window_out = [105 80 45 45];
+            window_out = [105 80 45 40];
         case 'sagittal'
             vol_out = rot90(permute(squeeze(volume(100:145, :, :)), [2, 3, 1]));
             window_out = [140 25 40 30];
         case 'coronal'
             vol_out = rot90(permute(squeeze(volume(:, 140:180, :)),[1, 3, 2]));
-            window_out = [105 20 45 30];
+            window_out = [105 20 30 45];
     end
 end
 
@@ -177,47 +211,33 @@ function [im_out] = overlay(im_in1, im_in2, rect)
 end
 
 % 2. IMPLEMENTED WORKFLOW
-% Performs preprocessing and segmentation on a slice
-function [im_out, area] = segmentation2(im_in, rect)
-    tmp_im = imcrop(im_in, [], rect); % Cropping out the ROI
-    tmp_im = medfilt2(tmp_im); % Applying median filtering
+% Performs preprocessing and segmentation on a slice by assuming that the
+% lesion is the largest relatively dense area in the ROI
+function [im_out, area] = segment(im_in)
+    tmp_im = medfilt2(im_in); % Applying preemptive median filtering
     tmp_im = im2double(tmp_im); % Standardizing the gray scale
     tmp_im = tmp_im > 0.50 & tmp_im < 0.85; % Empirical thresholding
     label = bwlabel(tmp_im); % Labeling continuous regions
-
-    % Statistics of continuous regions
-    stats = regionprops(logical(tmp_im), 'Solidity', 'Area');
+    stats = regionprops(logical(tmp_im), 'Solidity', 'Area'); % Stats of continuous regions
     density = [stats.Solidity]; area = [stats.Area];
-
-    % % Supposing the tumor is the largest dense area
     denseArea = density > 0.6; % Areas with empirical density
     maxArea = max(area(denseArea)); % Largest area with empirical density
     lesionLabel = find(area == maxArea); % Label of the supposed tumor
     lesion = ismember(label, lesionLabel); % Extracting the image from the label
-    filled_lesion = imfill(lesion, 'holes'); % Correcting the image
-
-    % Overlaying the segmented tumor on the original image
-    im_out = overlay(im_in, filled_lesion, rect);
-
+    im_out = imfill(lesion, 'holes'); % Correcting the image
     area = maxArea; % Cross-sectional area of the supposed tumor
-
 end
 
 % Performs preprocessing and segmentation on a volume
-function [] = segmentation3(volume, window)
+function [] = show_volume_segmentation(volume, window)
     for k = 1:size(volume, 3)
-        slice_k = slice(volume, k);
-
-        % TODO: Can feed to seg2 alreayd cropped
-        [tumor, area] = segmentation2(slice_k, window);
-
-        % TODO: Decide function behavior
-        imshow(tumor, [], 'InitialMagnification', 'fit')
+        slice_k = slice(volume, k); % Loading the slice
+        cropped_slice_k = imcrop(slice_k, [], window); % Cropping out the ROI
+        [lesion, area] = segment(cropped_slice_k); % Isolating the lesion
+        segmented_lesion = overlay(slice_k, lesion, window); % Segmenting the lesion
+        imshow(segmented_lesion, [], 'InitialMagnification', 'fit') % Displaying the segmentation
         title(['Cross-Sectional Area: ' num2str(area)])
         drawnow, pause(0.05)
-        % TODO: Create a montage instead of an animation (RGB problem)
-        % TODO: Understand how to display the cross-sectional area values
-        % axial_volume(:, :, k) = tumor;
     end
 end
 
@@ -232,26 +252,32 @@ function [vol_out] = addnoise(vol_in, noise, degree)
     % vol_out = tmp;
 end
 
-% Assesses if a power point transformation before the implementation of our
-% workflow enhances or worsens the performance by calculating the Dice
-% coefficient relatively to the true segmentation (ground truth)
+% Assesses whether a gamma correction enhances or worsens the performance
+% of our segmentation method by calculating the Dice coefficient and
+% comparing it with Otsu's method
 function [] = assess_gamma(volume, type, ground_truth)
-    [sel_vol, sel_wnd] = selectvol(volume, type); 
-    D = zeros(size(sel_vol, 3), 20); % 20 defined by gamma range
+    figure, [sel_vol, sel_wnd] = selectvol(volume, type); % Selecting
+
+    D1 = zeros(size(sel_vol, 3), 20); % 20 defined by gamma range
+    D2 = zeros(size(sel_vol, 3), 20); % 20 defined by gamma range
     for i = 1:size(sel_vol, 3)
         for gamma = 0.1:0.1:2
-            tmp = imadjust(sel_vol(:,:,i), [0 1], [0 1], gamma);
+            tmp = imadjust(sel_vol(:, :, i), [0 1], [0 1], gamma);
+            tmp = imcrop(tmp, [], sel_wnd); % Cropping out the ROI
+            tmp1 = segment(tmp); % Isolating the lesion with our workflow
+            tmp2 = imbinarize(tmp, graythresh(tmp)); % Isolating the lesion with Otsu's method
 
-            tmp = segmentation2(tmp, sel_wnd);
-            % TODO: substitute w/ our seg2
-            % tmp = imbinarize(tmp, graythresh(tmp));
-
-            D(i, int8(gamma * 10)) = dice(rot90(squeeze(ground_truth(i, :, :))), tmp);
+            % Saving the Dice coefficients
+            D1(i, int8(gamma * 10)) = dice(rot90(squeeze(ground_truth(:, :, i))), tmp1);
+            D2(i, int8(gamma * 10)) = dice(rot90(squeeze(ground_truth(:, :, i))), tmp2);
         end
-    end
-    figure
-    for i = 1:size(sel_vol, 3)
-        plot(D(i, :)), ylim([0 1]), xline(10,'LineWidth',3)
-        pause(0.05), drawnow
+
+        plot(D1(i, :)), hold on, plot(D2(i, :))
+        xline(10,'LineWidth',3) % i-th slice with gamma = 1
+        ylim([0 1]), xlim([0 20])
+        ylabel('Dice Coefficient'), xlabel('Brighter <-- 10 γ --> Darker')
+        legend({'Our Workflow', 'Otsu', ' γ = 1'}, 'Location', 'southwest')
+        title(['Analysis over ' type ' planes'])
+        pause(0.05), drawnow, hold off
     end
 end
