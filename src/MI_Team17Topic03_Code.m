@@ -248,8 +248,8 @@ function [] = assess_gamma(volume, type, ground_truth)
     D1 = zeros(size(sel_vol, 3), 20); % 20 defined by gamma range
     D2 = zeros(size(sel_vol, 3), 20); % 20 defined by gamma range
     for i = 1:size(sel_vol, 3)
-        for gamma = 0.1:0.1:1.8
-            if and(strcmp(type,'axial'),  gamma==1.9 )
+        for gamma = 0.1:0.1:2
+            if and(strcmp(type,'axial'),  gamma>=1.9 )
                 break
                 % for reasons unkown to humanity segmentation breaks with
                 % gamma values of 1.9 in some axial slices, somehow an
