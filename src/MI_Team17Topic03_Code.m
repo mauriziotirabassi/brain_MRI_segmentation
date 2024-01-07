@@ -1,5 +1,4 @@
-%% DATA EXTRACTIO
-% N
+%% DATA EXTRACTION
 clear variables; close all; clc
 
 % Setting the path to the resources relatively to the running OS
@@ -10,7 +9,6 @@ else
 end
 
 load('MRIdata.mat');
-% imshow(imread('memref.jpg'))
 
 %% VOLUME VISUALIZATION (DATA PREPARATION)
 
@@ -88,6 +86,7 @@ while 1
     % Segmenting the volume
     [sel_volume, sel_window] = selectvol(chosen_vol, volume_type);
     show_volume_segmentation(sel_volume, sel_window);
+    % imshow(imread('memref.jpg'))
     clc, close all
 end
 
