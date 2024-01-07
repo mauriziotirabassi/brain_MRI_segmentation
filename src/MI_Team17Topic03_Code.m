@@ -140,16 +140,6 @@ ylabel('Cross-Sectional Area'), xlabel('Noise Percentage')
 % some excesses manually
 true_seg = load('true_segmentation.mat').labels; % Ground truth
 
-%%
-% Sagittal Test with Noise
-for noise_level = 0.1:0.1:0.8
-    sg = addnoise(sg,'gaussian', noise_level);
-    ground_truth = true_seg;
-    assess_gamma(sg, ground_truth)
-end
-%no significant difference at increasing noise level
-
-%%
 % Command-line interface (CLI)
 valid_volume = {'axial', 'sagittal', 'coronal', ''};
 valid_noise = {'salt & pepper', 'gaussian', ''};
@@ -163,20 +153,21 @@ while 1
         clc, break
     end
 
-    if strcmp(volume_type, 'axial')
-        ground_truth = true_seg;
-    elseif strcmp(volume_type, 'sagittal')
-        ground_truth = permute(true_seg, [2 3 1]);
-    elseif strcmp(volume_type, 'coronal')
-        ground_truth = permute(true_seg, [3 1 2]);
+    switch volume_type
+        case 'axial'
+            ground_truth = true_seg;
+        case 'sagittal'
+            ground_truth = permute(true_seg, [2 3 1]);
+        case 'coronal'
+            ground_truth = permute(true_seg, [3 1 2]);
     end
-
+    
     % Assessing Dice coefficient
-    assess_gamma(vol, selectvol(vol, volume_type), ground_truth)
+    assess_gamma(vol, volume_type, ground_truth)
     clc, close all
 end
 
-%% Axial Test
+%% TODO: Degub
 ground_truth = true_seg;
 assess_gamma(vol, 'axial',  ground_truth)
 
@@ -219,9 +210,9 @@ function [im_out, area] = segment(im_in)
     tmp_im = tmp_im > 0.50 & tmp_im < 0.85; % Empirical thresholding
     label = bwlabel(tmp_im); % Labeling continuous regions
     stats = regionprops(logical(tmp_im), 'Solidity', 'Area'); % Stats of continuous regions
-    density = [stats.Solidity]; area = [stats.Area];
+    density = [stats.Solidity]; area = [stats.Area]; disp(size(area))
     denseArea = density > 0.6; % Areas with empirical density
-    maxArea = max(area(denseArea)); % Largest area with empirical density
+    maxArea = max(area(denseArea)); disp(size(maxArea)), disp('----') % Largest area with empirical density
     lesionLabel = find(area == maxArea); % Label of the supposed tumor
     lesion = ismember(label, lesionLabel); % Extracting the image from the label
     im_out = imfill(lesion, 'holes'); % Correcting the image
