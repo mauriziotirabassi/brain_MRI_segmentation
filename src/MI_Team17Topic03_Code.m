@@ -41,11 +41,11 @@ actual_num = 135 - sagittal_range(1); % Slice number
 [sg_vol, sg_wnd] = selectvol(vol, 'sagittal'); % Selecting sagittal volume and ROI
 slice_k = slice(sg_vol, actual_num); % Extracting the slice
 
-diocsn = imcrop(slice_k, [], sg_wnd); % TODO OOOOH
+crop = imcrop(slice_k, [], sg_wnd); 
 
-[tumor_k1, area_k] = segment(diocsn); % Segmenting the lesion
+[tumor_k1, area_k] = segment(crop); % Segmenting the lesion
 
-tumor1 = overlay(slice_k, tumor_k1, sg_wnd); % TODO DIOCAN
+tumor1 = overlay(slice_k, tumor_k1, sg_wnd); 
 
 % Displaying the segmentation
 imshow(tumor1, [], 'InitialMagnification', 'fit')
@@ -113,7 +113,7 @@ for noise_level = 0.01:0.01:1
     noised(i) = area_noise; % Saving the cross-sectional area
 
     % Segmenting with the application of the median filter
-    [~, area_filt] = segment(im_noise, sg_wnd);
+    [~, area_filt] = segment(im_noise);
     if isempty(area_filt)
         area_filt = 0;
     end
@@ -166,10 +166,6 @@ while 1
     assess_gamma(vol, volume_type, ground_truth)
     clc, close all
 end
-
-%% TODO: Degub
-ground_truth = true_seg;
-assess_gamma(vol, 'axial',  ground_truth)
 
 %% FUNCTIONS
 
@@ -252,7 +248,14 @@ function [] = assess_gamma(volume, type, ground_truth)
     D1 = zeros(size(sel_vol, 3), 20); % 20 defined by gamma range
     D2 = zeros(size(sel_vol, 3), 20); % 20 defined by gamma range
     for i = 1:size(sel_vol, 3)
-        for gamma = 0.1:0.1:2
+        for gamma = 0.1:0.1:1.8
+            if and(strcmp(type,'axial'),  gamma==1.9 )
+                break
+                % for reasons unkown to humanity segmentation breaks with
+                % gamma values of 1.9 in some axial slices, somehow an
+                % error occurs when looking for the max area among the
+                % segmented area in function segment
+            end
             tmp = imadjust(sel_vol(:, :, i), [0 1], [0 1], gamma);
             tmp = imcrop(tmp, [], sel_wnd); % Cropping out the ROI
             tmp1 = segment(tmp); % Isolating the lesion with our workflow
