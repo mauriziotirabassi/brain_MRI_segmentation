@@ -216,6 +216,9 @@ end
 
 % Performs preprocessing and segmentation on a volume
 function [] = show_volume_segmentation(volume, window)
+    % % Create a cell array to store frames for GIF   
+    % gifFrames = cell(1, size(volume, 3));
+
     for k = 1:size(volume, 3)
         slice_k = slice(volume, k); % Loading the slice
         cropped_slice_k = imcrop(slice_k, [], window); % Cropping out the ROI
@@ -223,8 +226,24 @@ function [] = show_volume_segmentation(volume, window)
         segmented_lesion = overlay(slice_k, lesion, window); % Segmenting the lesion
         imshow(segmented_lesion, [], 'InitialMagnification', 'fit') % Displaying the segmentation
         title(['Cross-Sectional Area: ' num2str(area)])
-        drawnow, pause(0.05)
+        drawnow
+        
+        % Get the current frame as an image
+        gifFrames{k} = frame2im(getframe(gcf));
+
+        pause(0.05)
     end
+
+    % % Save the frames as a GIF
+    % for idx = 1:size(gifFrames, 2)
+    %     [A, map] = rgb2ind(gifFrames{idx}, 256);
+    %     if idx == 1
+    %         imwrite(A, map, 'axial_noiseG.gif', 'gif', 'LoopCount', Inf, 'DelayTime', 0.05);
+    %     else
+    %         imwrite(A, map, 'axial_noiseG.gif', 'gif', 'WriteMode', 'append', 'DelayTime', 0.05);
+    %     end
+    % end
+
 end
 
 % Adds noise to a volume
@@ -246,6 +265,10 @@ function [] = assess_gamma(volume, type, ground_truth)
 
     D1 = zeros(size(sel_vol, 3), 20); % 20 defined by gamma range
     D2 = zeros(size(sel_vol, 3), 20); % 20 defined by gamma range
+
+    % % Create a cell array to store frames for GIF
+    % gifFrames = cell(1, size(sel_vol, 3));
+
     for i = 1:size(sel_vol, 3)
         for gamma = 0.1:0.1:2
             if and(strcmp(type,'axial'),  gamma>=1.9 )
@@ -269,8 +292,24 @@ function [] = assess_gamma(volume, type, ground_truth)
         xline(10,'LineWidth',3) % i-th slice with gamma = 1
         ylim([0 1]), xlim([0 20])
         ylabel('Dice Coefficient'), xlabel('Brighter <-- 10 γ --> Darker')
-        legend({'Our Workflow', 'Otsu', ' γ = 1'}, 'Location', 'southwest')
+        legend({'Pipeline', 'Otsu', ' γ = 1'}, 'Location', 'southwest')
         title(['Analysis of new ' type ' slice ' num2str(i)])
-        pause(0.05), drawnow, hold off
+        drawnow 
+
+        % % Get the current frame as an image
+        % gifFrames{i} = frame2im(getframe(gcf()));
+        pause(0.05), hold off
+        % close(gcf); % Close the frame after getting the image
     end
+
+    % % Save the frames as a GIF
+    % for idx = 1:size(gifFrames, 2)
+    %     [A, map] = rgb2ind(gifFrames{idx}, 256);
+    %     if idx == 1
+    %         imwrite(A, map, 'dice_coronal.gif', 'gif', 'LoopCount', Inf, 'DelayTime', 0.05);
+    %     else
+    %         imwrite(A, map, 'dice_coronal.gif', 'gif', 'WriteMode', 'append', 'DelayTime', 0.05);
+    %     end
+    % end
+
 end
