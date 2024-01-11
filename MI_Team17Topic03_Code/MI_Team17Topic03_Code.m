@@ -38,12 +38,9 @@ og_num = 135; % From reference
 actual_num = 135 - sagittal_range(1); % Slice number
 [sg_vol, sg_wnd] = selectvol(vol, 'sagittal'); % Selecting sagittal volume and ROI
 slice_k = slice(sg_vol, actual_num); % Extracting the slice
-
-crop = imcrop(slice_k, [], sg_wnd); 
-
-[tumor_k1, area_k] = segment(crop); % Segmenting the lesion
-
-tumor1 = overlay(slice_k, tumor_k1, sg_wnd); 
+crop = imcrop(slice_k, [], sg_wnd); % Cropping out the ROI
+[tumor_k1, area_k] = segment(crop); % Extracting the lesion
+tumor1 = overlay(slice_k, tumor_k1, sg_wnd); % Segmenting the lesion
 
 % Displaying the segmentation
 imshow(tumor1, [], 'InitialMagnification', 'fit')
@@ -66,6 +63,7 @@ while 1
     end
 
     % Requesting user to add noise
+
     noise_type = input('Insert noise to add (enter if none): ', 's');
     while ~any(strcmp(noise_type, valid_noise))
         noise_type = input('Insert noise to add (enter if none): ', 's');
@@ -120,8 +118,8 @@ for noise_level = 0.01:0.01:1
     i = i + 1;
 end
 
-figure, plot(filtered), hold on, plot(noised), hold on
-refline(0, area_k); % Cross-sectional area without noise
+figure, plot(filtered, 'LineWidth', 2), hold on, plot(noised, 'LineWidth', 2), hold on
+yline(area_k, 'LineWidth', 2); % Cross-sectional area without noise
 legend({'Filtered', 'Noise', 'Clean'}, 'Location', 'southwest')
 ylabel('Cross-Sectional Area'), xlabel('Noise Percentage')
 
@@ -238,9 +236,9 @@ function [] = show_volume_segmentation(volume, window)
     % for idx = 1:size(gifFrames, 2)
     %     [A, map] = rgb2ind(gifFrames{idx}, 256);
     %     if idx == 1
-    %         imwrite(A, map, 'axial_noiseG.gif', 'gif', 'LoopCount', Inf, 'DelayTime', 0.05);
+    %         imwrite(A, map, 'sagittal.gif', 'gif', 'LoopCount', Inf, 'DelayTime', 0.05);
     %     else
-    %         imwrite(A, map, 'axial_noiseG.gif', 'gif', 'WriteMode', 'append', 'DelayTime', 0.05);
+    %         imwrite(A, map, 'sagittal.gif', 'gif', 'WriteMode', 'append', 'DelayTime', 0.05);
     %     end
     % end
 
