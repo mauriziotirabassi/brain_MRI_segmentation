@@ -236,9 +236,9 @@ function [] = show_volume_segmentation(volume, window)
     % for idx = 1:size(gifFrames, 2)
     %     [A, map] = rgb2ind(gifFrames{idx}, 256);
     %     if idx == 1
-    %         imwrite(A, map, 'sagittal.gif', 'gif', 'LoopCount', Inf, 'DelayTime', 0.05);
+    %         imwrite(A, map, 'axial_noise1.gif', 'gif', 'LoopCount', Inf, 'DelayTime', 0.05);
     %     else
-    %         imwrite(A, map, 'sagittal.gif', 'gif', 'WriteMode', 'append', 'DelayTime', 0.05);
+    %         imwrite(A, map, 'axial_noise1.gif', 'gif', 'WriteMode', 'append', 'DelayTime', 0.05);
     %     end
     % end
 
